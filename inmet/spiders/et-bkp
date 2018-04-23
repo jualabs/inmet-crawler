@@ -1,0 +1,47 @@
+import scrapy
+
+
+class EstacoesSpider(scrapy.Spider):
+    name = "estacoes"
+    cookie = ""
+
+    def start_requests(self):
+        f = open('/home/glauco/code/inmet/inmet/metadata/url.data','r')
+        urls = []
+        for l in f:
+            urls.append(l.replace('\n',''))
+        f.close()
+	#urls = [
+        #    'http://www.inmet.gov.br/sonabra/pg_dspDadosCodigo_sim.php?QTM1MA=='
+        #]
+	
+        dadosConsulta = {
+            'aleaValue': 'MzYzNw==',
+            'dtaini': '12/12/2017',
+            'dtafim': '12/12/2017',
+            'aleaNum': '3637'
+        }
+        for url in urls:
+            yield scrapy.FormRequest(url=url, formdata=dadosConsulta, callback=self.parse_form, priority=1)
+            #yield scrapy.Request(url=url, callback=self.parse)
+
+    def parse_form(self, response):
+        try:
+            self.cookie = response.headers["Set-Cookie"]
+        except:
+            self.cookie = self.cookie
+        cabecalho = {
+            'Cookie': self.cookie
+        }
+        self.log('Get data from the site')
+        url = 'http://www.inmet.gov.br/sonabra/pg_downDadosCodigo_sim.php'
+        yield scrapy.Request(url=url, callback=self.parse_data, headers= cabecalho, dont_filter=True, priority=2)
+
+    def parse_data(self, response):
+        self.log('Lets save data...')
+        body = response.text
+        estacao = body.split('<br>')[1].split(',')[0]
+        filename = '/home/glauco/code/inmet/inmet/data/estacao-%s.html' % estacao
+        with open(filename, 'wb') as f:
+            f.write(response.body)
+        self.log('Saved file %s' % filename)
